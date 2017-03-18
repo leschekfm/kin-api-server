@@ -6,7 +6,6 @@
 
 
 const KinRequest = require('../kin_request');
-const { disconnect_source } = require('../../utils');
 
 const _ = require('lodash');
 
@@ -19,26 +18,18 @@ const TODOIST_SCOPES = [
     'data:delete',
 ];
 
-function is_invalid_creds_error(err) {
-    return err.statusCode === 403;
-}
-
 
 class TodoistRequest extends KinRequest {
     constructor(req, source_id) {
         super(req, source_id, TODOIST_API_BASE_URL);
     }
 
-    api(uri, options = {}, attempt = 0) {
-        return super
-            .api(uri, options, attempt)
-            .catch((err) => {
-                if (is_invalid_creds_error(err)) {
-                    disconnect_source(this._req, this._source, err);
-                } else {
-                    throw err;
-                }
-            });
+    get source_name() {
+        return 'todoist';
+    }
+
+    is_invalid_creds_error(err) {
+        return err.statusCode === 403;
     }
 
     api_request_options(access_token, overrides) {

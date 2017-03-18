@@ -6,7 +6,6 @@
 
 
 const KinRequest = require('../kin_request');
-const { disconnect_source } = require('../../utils');
 
 const _ = require('lodash');
 
@@ -17,26 +16,14 @@ const GITHUB_SCOPES = [
     'repo',
 ];
 
-function is_invalid_creds_error(err) {
-    return err.statusCode === 401;
-}
-
 
 class GithubRequest extends KinRequest {
     constructor(req, source_id) {
         super(req, source_id, GITHUB_API_BASE_URL);
     }
 
-    api(uri, options = {}, attempt = 0) {
-        return super
-            .api(uri, options, attempt)
-            .catch((err) => {
-                if (is_invalid_creds_error(err)) {
-                    disconnect_source(this._req, this._source, err);
-                } else {
-                    throw err;
-                }
-            });
+    get source_name() {
+        return 'github';
     }
 
     api_request_options(access_token, overrides) {

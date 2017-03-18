@@ -114,24 +114,50 @@ describe('Todoist', function () {
                     .reply(200, {
                         items: [
                             {
-                                id: 112233,
-                                project_id: 1234,
+                                // Nominal
+                                all_day: false,
                                 content: 'Alpha',
                                 due_date_utc: 'Mon 10 Oct 2016 10:00:00 +0000',
+                                id: 112233,
+                                project_id: 1234,
+                                in_history: 0,
                             },
                             {
-                                id: 445566,
-                                project_id: 1234,
+                                // No due date, should be filtered
                                 content: 'Beta',
                                 due_date_utc: null,
+                                id: 445566,
+                                project_id: 1234,
+                                in_history: 0,
                             },
                             {
+                                // Wrong project, should be filtered
+                                content: 'Gamma',
+                                due_date_utc: 'Mon 10 Oct 2016 10:00:00 +0000',
                                 id: 778899,
                                 project_id: 5678,
-                                content: 'Gamma',
-                                due_date_utc: null,
+                                in_history: 0,
+                            },
+                            {
+                                // All-day
+                                all_day: true,
+                                content: 'Delta',
+                                due_date_utc: 'Mon 10 Oct 2016 10:00:00 +0000',
+                                id: 101010,
+                                project_id: 1234,
+                                in_history: 0,
+                            },
+                            {
+                                // FIXME: No `all-day` parameter as it's undocumented
+                                // by Todoist, should defaults to non all-day
+                                content: 'Epsilon',
+                                due_date_utc: 'Mon 10 Oct 2016 10:00:00 +0000',
+                                id: 111111,
+                                project_id: 1234,
+                                in_history: 0,
                             },
                         ],
+                        sync_token: 'nextSuperAwesomeSyncToken',
                     });
 
                 return expect(todoist_actions.load_events(
@@ -143,15 +169,106 @@ describe('Todoist', function () {
                             title: 'Alpha',
                             kind: 'event#basic',
                             start: {
+                                date_time: '2016-10-10T10:00:00+0000',
+                            },
+                            end: {
+                                date_time: '2016-10-10T11:00:00+0000',
+                            },
+                            link: 'https://en.todoist.com/app#project%2F1234',
+                            status: 'confirmed',
+                        },
+                        {
+                            id: 'kin-1234:1234:101010',
+                            title: 'Delta',
+                            kind: 'event#basic',
+                            start: {
                                 date: '2016-10-10',
                             },
                             end: {
                                 date: '2016-10-11',
                             },
                             link: 'https://en.todoist.com/app#project%2F1234',
+                            status: 'confirmed',
                         },
-                        // Beta and Gamma should not be there ;)
+                        {
+                            id: 'kin-1234:1234:111111',
+                            title: 'Epsilon',
+                            kind: 'event#basic',
+                            start: {
+                                date_time: '2016-10-10T10:00:00+0000',
+                            },
+                            end: {
+                                date_time: '2016-10-10T11:00:00+0000',
+                            },
+                            link: 'https://en.todoist.com/app#project%2F1234',
+                            status: 'confirmed',
+                        },
                     ],
+                    next_sync_token: 'nextSuperAwesomeSyncToken',
+                    sync_type: 'full',
+                });
+            });
+            it('eventually returns a set of events when providing a sync token', function () {
+                this.stubs.req.query.sync_token = 'superAwesomeSyncToken';
+                const layer_id = 'kin-1234:1234';
+                nock(TODOIST_API_BASE_URL)
+                    .post('/sync')
+                    .reply(200, {
+                        items: [
+                            {
+                                all_day: false,
+                                content: 'Alpha',
+                                due_date_utc: 'Mon 10 Oct 2016 10:00:00 +0000',
+                                id: 112233,
+                                project_id: 1234,
+                                in_history: 0,
+                            },
+                            {
+                                // Item is marked as completed
+                                all_day: false,
+                                content: 'Beta',
+                                due_date_utc: 'Mon 11 Oct 2016 10:00:00 +0000',
+                                id: 445566,
+                                project_id: 1234,
+                                in_history: 1,
+                            },
+                        ],
+                        sync_token: 'nextSuperAwesomeSyncToken',
+                    });
+
+                return expect(todoist_actions.load_events(
+                    this.stubs.req, this.stubs.source, layer_id)  // eslint-disable-line comma-dangle
+                ).to.eventually.deep.equal({
+                    events: [
+                        {
+                            id: 'kin-1234:1234:112233',
+                            title: 'Alpha',
+                            kind: 'event#basic',
+                            start: {
+                                date_time: '2016-10-10T10:00:00+0000',
+                            },
+                            end: {
+                                date_time: '2016-10-10T11:00:00+0000',
+                            },
+                            link: 'https://en.todoist.com/app#project%2F1234',
+                            status: 'confirmed',
+                        },
+                        {
+                            id: 'kin-1234:1234:445566',
+                            title: 'Beta',
+                            kind: 'event#basic',
+                            start: {
+                                date_time: '2016-10-11T10:00:00+0000',
+                            },
+                            end: {
+                                date_time: '2016-10-11T11:00:00+0000',
+                            },
+                            link: 'https://en.todoist.com/app#project%2F1234',
+                            status: 'cancelled',
+                        },
+                    ],
+                    next_sync_token: 'nextSuperAwesomeSyncToken',
+                    sync_type: 'incremental',
                 });
             });
         });
@@ -165,22 +282,12 @@ describe('Todoist', function () {
                 this.stub_reply = {
                     items: [
                         {
-                            id: 112233,
-                            project_id: 1234,
+                            all_day: true,
                             content: 'Alpha',
                             due_date_utc: 'Mon 10 Oct 2016 10:00:00 +0000',
-                        },
-                        {
-                            id: 445566,
+                            id: 112233,
                             project_id: 1234,
-                            content: 'Beta',
-                            due_date_utc: null,
-                        },
-                        {
-                            id: 778899,
-                            project_id: 5678,
-                            content: 'Gamma',
-                            due_date_utc: null,
+                            in_history: 0,
                         },
                     ],
                 };
@@ -195,6 +302,7 @@ describe('Todoist', function () {
                     },
                     kind: 'event#basic',
                     link: 'https://en.todoist.com/app#project%2F1234',
+                    status: 'confirmed',
                 };
             });
 
@@ -250,7 +358,7 @@ describe('Todoist', function () {
                             type: 'item_update',
                             uuid: '#RealStringsHaveEntropy',
                             args: {
-                                due_date_utc: '2016-10-12T00:00',
+                                due_date_utc: '2016-10-12T23:59:59',
                                 date_string: 'today',
                                 id: '112233',
                             },
